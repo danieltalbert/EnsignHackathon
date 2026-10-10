@@ -308,6 +308,13 @@ def storage_snapshot(findings):
         "__pycache__", ".local/share/Trash"
     }
 
+    # Construct the signature from separate pieces so the scanner's own
+    # source code does not contain the complete test signature.
+    eicar_signature = (
+        b"X5O!P%@AP["
+        + b"4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+    )
+
     # Collect metadata only. Keep output lists separate from the scan.
     # The scan remains bounded by MAX_FILES for small machines.
     for root, dirs, files in os.walk(HOME, followlinks=False):
@@ -330,6 +337,37 @@ def storage_snapshot(findings):
                 executable = bool(st.st_mode & 0o111) or suffix in executable_ext
                 signals = []
                 score = 0
+                eicar_match = False
+
+                # Inspect small files only, with a strict read-size bound.
+                # This detects the standard test artifact without uploading
+                # file contents or reading arbitrary large files.
+                if 0 < st.st_size <= 256:
+                    try:
+                        with path.open("rb") as handle:
+                            sample = handle.read(257)
+
+                        trailing = sample[len(eicar_signature):]
+                        if (
+                            sample.startswith(eicar_signature)
+                            and not trailing.strip(b" \\t\\r\\n")
+                        ):
+                            eicar_match = True
+                    except OSError:
+                        pass
+
+                if eicar_match:
+                    signals.append("Exact EICAR antivirus test signature detected")
+                    score = 100
+                    add(
+                        findings, "Storage", "medium",
+                        "EICAR antivirus test signature detected",
+                        f"{key} matches the standard EICAR antivirus test string. "
+                        "This is a benign test artifact, not proof of an actual infection.",
+                        "Detection succeeded for a standard antivirus test artifact. "
+                        "Remove the test file manually when testing is complete.",
+                        "high"
+                    )
 
                 current[key] = {
                     "size": st.st_size,
@@ -386,6 +424,7 @@ def storage_snapshot(findings):
                     "score": score,
                     "signals": signals,
                     "hash_match": False,
+                    "eicar_match": eicar_match,
                 }
                 file_items.append(item)
 
@@ -539,7 +578,10 @@ def ollama_analysis(report):
         "(info/low/medium/high/critical), findings (array of objects with finding_id, "
         "explanation, confidence (low/medium/high), recommendation), and limitations "
         "(array of strings). Include only IDs from the supplied findings. "
-        "If evidence is insufficient, say so.\n\nEVIDENCE:\n"
+        "If evidence is insufficient, say so. "
+        "If a finding identifies the EICAR antivirus test signature, explain "
+        "that it is a benign test artifact, not proof of a real infection. "
+        "Do not deny that the signature was detected.\n\nEVIDENCE:\n"
         + json.dumps(report, ensure_ascii=True)[:36000]
     )
     prompt += (

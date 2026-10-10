@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><title>Sentinel Local — Security Assessment</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar"><div class="brandmark">S</div><div><strong>Sentinel<span>Local</span></strong><small>LOCAL SECURITY ASSESSMENT</small></div><div class="topright"><i class="dot"></i> MANUAL SCAN <span id="clock">--:--:--</span></div></header>
+<main>
+<section class="hero"><div><p class="eyebrow">YOUR MACHINE. YOUR DATA.</p><h1>Security overview<span class="accent">.</span></h1><p class="muted">Evidence-first endpoint inspection with optional local AI analysis.</p></div><button id="scanBtn" class="primary" onclick="runScan()">▶ Run security assessment</button></section>
+<div id="notice" class="notice">Ready. Scans run only when you press the button.</div>
+<section class="metrics">
+<article class="metric"><div class="metric-head">CPU LOAD</div><div class="metric-value" id="cpu">—</div><div class="meter"><i id="cpuBar"></i></div></article>
+<article class="metric"><div class="metric-head">RAM USED</div><div class="metric-value" id="ram">—</div><div class="meter"><i id="ramBar"></i></div><p id="ramMeta">—</p></article>
+<article class="metric"><div class="metric-head">DISK USED</div><div class="metric-value" id="disk">—</div><div class="meter"><i id="diskBar"></i></div><p id="diskMeta">—</p></article>
+<article class="metric"><div class="metric-head">FINDINGS</div><div class="metric-value" id="findingCount">—</div><p>Items to review, not confirmed infections</p></article>
+</section>
+<section class="panel"><div class="section-head"><div><p class="eyebrow">01 / ASSESSMENT</p><h2>Scan summary</h2></div><span class="pill">READ ONLY</span></div><div class="info-grid" id="systemInfo"><p class="muted">Run an assessment to collect data.</p></div><div id="counts" class="counts"></div></section>
+<section class="panel"><div class="section-head"><div><p class="eyebrow">02 / FINDINGS</p><h2>Security findings</h2></div><select id="filter" onchange="renderFindings()"><option value="All">All categories</option><option>Network</option><option>Storage</option><option>Processes</option></select></div><div id="findings"><p class="muted">Your findings will appear here after a scan.</p></div></section>
+<section class="two-col">
+<section class="panel network-panel"><div class="section-head"><div><p class="eyebrow">03 / NETWORK</p><h2>Visible connections</h2></div><span class="pill">SNAPSHOT</span></div><p id="networkNote" class="muted small">Not scanned yet.</p><div class="network-content"><div class="table-wrap"><table><thead><tr><th>PROTOCOL</th><th>LOCAL</th><th>REMOTE</th><th>STATE</th><th>PID</th></tr></thead><tbody id="networkRows"><tr><td colspan="5">No data</td></tr></tbody></table></div><h3>DNS resolver configuration</h3><pre id="dns">—</pre><h3>ARP / neighbour entries</h3><div id="arp" class="file-list">—</div><h3>Wi-Fi entries</h3><pre id="wifi">Unavailable or not exposed to this Linux environment.</pre></div></section>
+<section class="panel"><div class="section-head"><div><p class="eyebrow">04 / STORAGE</p><h2>Cleanup advisor</h2></div></div><p id="storageNote" class="muted small">No storage scan yet.</p><div id="files" class="file-list"></div></section>
+</section>
+<section class="panel"><div class="section-head"><div><p class="eyebrow">05 / PROCESS INVENTORY</p><h2>Resource consumers</h2></div><span class="pill">TOP 30</span></div><div class="table-wrap"><table><thead><tr><th>PROCESS</th><th>PID</th><th>PARENT</th><th>CPU</th><th>RAM</th><th>EXECUTABLE</th></tr></thead><tbody id="processRows"><tr><td colspan="6">No data</td></tr></tbody></table></div></section>
+<section class="panel ai-panel"><div><p class="eyebrow">06 / LOCAL AI ANALYST</p><h2>Explain the evidence<span class="accent">.</span></h2><p class="muted">Sends the current report over HTTPS to the team's remote Gemma server (Ollama). AI output is advisory; the Python collectors remain the source of observations.</p><p id="modelLabel" class="subtle">Model: gemma4:e4b</p><button id="aiBtn" class="primary" onclick="analyze()" disabled>✳ Analyze with Gemma</button></div><div id="aiResult" class="ai-result">Run a scan first.</div></section>
+<footer>Sentinel Local · Manual snapshots · No automatic remediation · Linux container visibility varies</footer>
+</main><script src="/static/app.js"></script>
+</body></html>

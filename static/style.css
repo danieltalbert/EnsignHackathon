@@ -11,3 +11,60 @@ main{max-width:1450px;margin:auto;padding:36px max(5vw,20px) 22px}.hero{display:
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}.two-col .panel{margin-bottom:18px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;text-align:left;white-space:nowrap}th{font:9px monospace;color:var(--muted);letter-spacing:1px;padding:11px 9px;border-bottom:1px solid var(--line)}td{padding:12px 9px;border-bottom:1px solid #1c2732;font-size:11px}tbody tr:last-child td{border-bottom:0}td:first-child{color:var(--text);font-weight:600}.file-list{max-height:420px;overflow:auto}.file-item{padding:11px 2px;border-bottom:1px solid var(--line);font-size:11px;overflow-wrap:anywhere}.file-item strong{font-size:12px}.file-item p{color:var(--muted);line-height:1.5}.ai-panel{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(0,1.2fr);gap:28px}.ai-result{border:1px solid var(--line);border-radius:10px;padding:16px;background:var(--panel2);min-width:0;overflow-wrap:anywhere}.ai-result p,.ai-result li{font-size:12px;line-height:1.6;color:#c4ced8}.ai-finding{border-top:1px solid var(--line);padding:8px 0}.ai-finding small{color:var(--muted)}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel2);padding:12px;border-radius:8px;color:var(--muted);font-size:11px}footer{text-align:center;color:#687989;font:10px monospace;padding:18px}
 @media(max-width:900px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col,.ai-panel{grid-template-columns:1fr}.info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.topright{font-size:0}.topright #clock{font-size:10px}}
 @media(max-width:520px){main{padding:25px 14px}.topbar{padding:0 14px}.hero{align-items:flex-start;flex-direction:column}.metrics{gap:9px}.metric{padding:13px}.metric-value{font-size:26px}.panel{padding:15px}.section-head{align-items:flex-start}}
+
+/* Balanced two-panel layout: equal height, internal scrolling. */
+.two-col {
+    align-items: stretch;
+}
+
+.two-col > .panel {
+    height: 440px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.two-col > .panel:first-child {
+    overflow-y: auto;
+}
+
+.two-col > .panel:last-child {
+    display: flex;
+    flex-direction: column;
+}
+
+.two-col > .panel:last-child .file-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+}
+
+/* On narrow screens, let panels flow naturally in one column. */
+@media (max-width: 900px) {
+    .two-col > .panel {
+        height: auto;
+        overflow: visible;
+    }
+
+    .two-col > .panel:last-child {
+        display: block;
+    }
+
+    .two-col > .panel:last-child .file-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+}
+
+
+/* Keep the Visible connections heading fixed while its content scrolls. */
+.two-col > .network-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.network-panel .network-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}

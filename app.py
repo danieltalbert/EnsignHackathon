@@ -295,16 +295,27 @@ def network_snapshot(findings):
 def storage_snapshot(findings):
     previous = read_baseline().get("files", {})
     known = read_known_hashes()
-    current, candidates = {}, []
+    current, file_items = {}, []
     scanned = 0
     now_ts = time.time()
     old_days = 180
-    executable_ext = {".sh", ".py", ".pl", ".rb", ".bin", ".elf", ".run", ".AppImage"}
+    executable_ext = {
+        ".sh", ".py", ".pl", ".rb", ".bin", ".elf",
+        ".run", ".appimage", ".deb", ".desktop"
+    }
+    skip = {
+        ".cache", ".git", ".venv", "venv", "node_modules",
+        "__pycache__", ".local/share/Trash"
+    }
 
-    skip = {".cache", ".git", ".venv", "venv", "node_modules",
-            "__pycache__", ".local/share/Trash"}
+    # Collect metadata only. Keep output lists separate from the scan.
+    # The scan remains bounded by MAX_FILES for small machines.
     for root, dirs, files in os.walk(HOME, followlinks=False):
-        dirs[:] = [d for d in dirs if d not in skip and not d.startswith(".cache")]
+        dirs[:] = [
+            d for d in dirs
+            if d not in skip and not d.startswith(".cache")
+        ]
+
         for name in files:
             path = Path(root) / name
             try:
@@ -314,80 +325,178 @@ def storage_snapshot(findings):
                 scanned += 1
                 key = str(path)
                 age = max(0, int((now_ts - st.st_mtime) / 86400))
-                current[key] = {"size": st.st_size, "mtime": int(st.st_mtime)}
-                if st.st_size >= 50 * 1024**2 or age >= old_days:
-                    candidates.append({
-                        "path": key, "name": name, "size": st.st_size,
-                        "size_label": human(st.st_size), "age_days": age,
-                        "reason": ("Large file; review whether it is needed"
-                                   if st.st_size >= 50 * 1024**2
-                                   else "Not modified in 180+ days; review before removing")
-                    })
-
+                old = previous.get(key)
                 suffix = path.suffix.lower()
-                is_exec = bool(st.st_mode & 0o111) or suffix in executable_ext
-                if is_exec:
-                    old = previous.get(key)
-                    if old is None:
-                        add(findings, "Storage", "medium", "Executable not in previous baseline",
-                            f"{key} (size {human(st.st_size)}). This is only new relative to the previous successful scan.",
-                            "Check the file's origin, owner, and package/source. First scan establishes a baseline; new does not mean malicious.",
-                            "low")
-                    elif old.get("mtime") != int(st.st_mtime) or old.get("size") != st.st_size:
-                        add(findings, "Storage", "info", "Executable changed since baseline",
+                executable = bool(st.st_mode & 0o111) or suffix in executable_ext
+                signals = []
+                score = 0
+
+                current[key] = {
+                    "size": st.st_size,
+                    "mtime": int(st.st_mtime)
+                }
+
+                if st.st_size >= 50 * 1024**2:
+                    signals.append("Large file; size alone is not suspicious")
+                if age >= old_days:
+                    signals.append("Unchanged for 180+ days; age alone is not suspicious")
+
+                if executable:
+                    if previous and old is None:
+                        signals.append("Executable absent from previous baseline")
+                        score += 2
+                        add(
+                            findings, "Storage", "medium",
+                            "Executable not in previous baseline",
+                            f"{key} (size {human(st.st_size)}).",
+                            "Verify its source, owner, and purpose. New does not mean malicious.",
+                            "low"
+                        )
+                    elif old and (
+                        old.get("mtime") != int(st.st_mtime)
+                        or old.get("size") != st.st_size
+                    ):
+                        signals.append("Executable metadata changed since baseline")
+                        score += 1
+                        add(
+                            findings, "Storage", "info",
+                            "Executable changed since baseline",
                             f"{key} metadata changed since the previous scan.",
-                            "Verify whether a legitimate update or installation explains the change.",
-                            "low")
+                            "Check whether a legitimate update or installation explains the change.",
+                            "low"
+                        )
+
+                    if name.startswith("."):
+                        signals.append("Hidden executable filename")
+                        score += 1
+
+                    if any(part.lower() in {"downloads", "desktop"} for part in path.parts):
+                        signals.append("Executable in Downloads/Desktop")
+                        score += 1
+
+                item = {
+                    "path": key,
+                    "name": name,
+                    "size": st.st_size,
+                    "size_label": human(st.st_size),
+                    "age_days": age,
+                    "extension": suffix or "(none)",
+                    "executable": executable,
+                    "hidden": name.startswith("."),
+                    "score": score,
+                    "signals": signals,
+                    "hash_match": False,
+                }
+                file_items.append(item)
 
                 if scanned >= MAX_FILES:
                     break
-            except (OSError, PermissionError):
+            except OSError:
                 continue
+
         if scanned >= MAX_FILES:
             break
 
-    # Hash known executable candidates only; no external reputation service.
-    for candidate in candidates[:80]:
-        path = Path(candidate["path"])
-        if path.suffix.lower() in executable_ext or os.access(path, os.X_OK):
-            digest = sha256_file(path)
-            if digest and digest in known:
-                add(findings, "Storage", "critical", "Hash matches local indicator list",
-                    f"SHA-256 {digest} for {path}.",
-                    "Treat as a high-priority lead, verify the indicator's provenance, and follow your incident-response process. Do not execute the file.",
-                    "high")
+    # Hash only a bounded number of executable files, never every file.
+    hash_checked = 0
+    executable_items = sorted(
+        (x for x in file_items if x["executable"]),
+        key=lambda x: (x["score"], x["size"]),
+        reverse=True
+    )
+    for item in executable_items:
+        if hash_checked >= 80:
+            break
+        hash_checked += 1
+        digest = sha256_file(Path(item["path"]))
+        if digest and digest in known:
+            item["hash_match"] = True
+            item["score"] = 100
+            item["signals"].append("SHA-256 matches local indicator list")
+            add(
+                findings, "Storage", "critical",
+                "Hash matches local indicator list",
+                f"SHA-256 {digest} for {item['path']}.",
+                "Verify the indicator's provenance and investigate before taking action.",
+                "high"
+            )
 
-    # A single snapshot cannot prove mass encryption; metadata changes between
-    # baselines provide a cautious indicator only when a substantial pattern exists.
     changed = 0
     if previous:
         for key, info in current.items():
             old = previous.get(key)
-            if old and info["mtime"] != old.get("mtime") and info["size"] != old.get("size"):
+            if (
+                old
+                and info["mtime"] != old.get("mtime")
+                and info["size"] != old.get("size")
+            ):
                 changed += 1
-        if changed >= 40:
-            add(findings, "Storage", "medium", "Many files changed since baseline",
-                f"{changed} files have both size and modification-time changes since the previous scan.",
-                "Review recent activity and backups. This is not proof of ransomware; normal bulk edits, builds, or updates can cause this pattern.",
-                "low")
 
-    candidates.sort(key=lambda x: x["size"], reverse=True)
+    if changed >= 40:
+        add(
+            findings, "Storage", "medium", "Many files changed since baseline",
+            f"{changed} files have both size and modification-time changes.",
+            "Review recent activity. Bulk edits and updates can cause this pattern; it is not proof of ransomware.",
+            "low"
+        )
+
+    def recommendation(item):
+        suffix = item["extension"].lower()
+        if suffix in {".tmp", ".part", ".swp", ".old", ".bak"}:
+            return (
+                "If this is obsolete and not in use, verify it is safe and "
+                "re-creatable before considering cleanup."
+            )
+        if suffix in {".zip", ".tar", ".gz", ".deb", ".iso", ".appimage"}:
+            return (
+                "If this is a duplicate installer or archive, verify another "
+                "copy exists before considering cleanup."
+            )
+        if item["executable"]:
+            return (
+                "Do not delete based on this scan alone. Verify its source, "
+                "purpose, and whether software depends on it."
+            )
+        return (
+            "Review its purpose and whether it is needed. Size and age alone "
+            "cannot establish that a file is safe to delete."
+        )
+
+    for item in file_items:
+        item["recommendation"] = recommendation(item)
+
+    # Largest files are surfaced independently of suspiciousness or age.
+    largest = sorted(file_items, key=lambda x: x["size"], reverse=True)[:25]
+
+    candidates = [
+        x for x in file_items
+        if x["signals"] or x["executable"]
+    ]
+    candidates.sort(
+        key=lambda x: (x["score"], x["size"]),
+        reverse=True
+    )
+
+    disk = psutil.disk_usage(str(HOME))
     return {
         "files_scanned": scanned,
         "truncated": scanned >= MAX_FILES,
         "total_candidate_count": len(candidates),
-        "candidates": candidates[:100],
+        "candidates": candidates[:80],
+        "largest_files": largest,
         "disk": {
-            "total": psutil.disk_usage(str(HOME)).total,
-            "used": psutil.disk_usage(str(HOME)).used,
-            "free": psutil.disk_usage(str(HOME)).free,
-            "percent": psutil.disk_usage(str(HOME)).percent,
+            "total": disk.total,
+            "used": disk.used,
+            "free": disk.free,
+            "percent": disk.percent,
         },
         "limitations": [
-            "Only a bounded subset of the home directory is scanned.",
-            "System-directory integrity is not fully audited in this build.",
+            "Metadata scanning is bounded by MAX_FILES and excludes selected cache and development directories.",
+            "The largest-files list is based on the files reached during this scan.",
+            "File contents are not uploaded for AI analysis; assessments use metadata and scan evidence.",
+            "Size, age, hidden names, and executable status are review signals, not proof of malware.",
             "Hash matching uses only locally supplied SHA-256 indicators.",
-            "Mass encryption requires trustworthy change history."
+            "No files are deleted or modified by this advisor.",
         ],
     }
 
@@ -431,8 +540,20 @@ def ollama_analysis(report):
         "explanation, confidence (low/medium/high), recommendation), and limitations "
         "(array of strings). Include only IDs from the supplied findings. "
         "If evidence is insufficient, say so.\n\nEVIDENCE:\n"
-        + json.dumps(report, ensure_ascii=True)[:24000]
+        + json.dumps(report, ensure_ascii=True)[:36000]
     )
+    prompt += (
+        "\n\nFILE METADATA TASK: Also return file_assessments, an array of "
+        "objects with path, verdict, confidence, explanation, recommendation. "
+        "Assess only paths present in storage.candidates or storage.largest_files. "
+        "Use verdict keep, review, or possible_cleanup. Never infer malware from "
+        "size, age, extension, hidden status, or executable status alone. "
+        "Use possible_cleanup only when the metadata gives a clear reason to "
+        "suspect an obsolete temporary artifact; otherwise use review. "
+        "Do not recommend deleting executables, user documents, or unknown files "
+        "based on metadata alone. Explain uncertainty and recommend verification."
+    )
+
     body = json.dumps({
         "model": OLLAMA_MODEL,
         "stream": False,
@@ -459,6 +580,29 @@ def ollama_analysis(report):
             f for f in parsed.get("findings", [])
             if f.get("finding_id") in valid_ids
         ]
+        storage = report.get("storage", {})
+        valid_file_paths = {
+            str(item.get("path"))
+            for group in ("candidates", "largest_files")
+            for item in storage.get(group, [])
+            if isinstance(item, dict) and item.get("path")
+        }
+        assessments = []
+        for item in parsed.get("file_assessments", []):
+            if not isinstance(item, dict) or item.get("path") not in valid_file_paths:
+                continue
+            verdict = item.get("verdict", "review")
+            if verdict not in {"keep", "review", "possible_cleanup"}:
+                verdict = "review"
+            assessments.append({
+                "path": item["path"],
+                "verdict": verdict,
+                "confidence": str(item.get("confidence", "low"))[:30],
+                "explanation": str(item.get("explanation", ""))[:1000],
+                "recommendation": str(item.get("recommendation", ""))[:1000],
+            })
+        parsed["file_assessments"] = assessments[:25]
+
         return {"available": True, "model": OLLAMA_MODEL, "analysis": parsed}
     except (OSError, ValueError, KeyError, TypeError, AttributeError,
             urllib.error.URLError, http.client.HTTPException) as e:

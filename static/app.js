@@ -23,8 +23,10 @@ async function runScan(){
   $('dns').textContent=r.network.dns_resolver_config||'Unavailable';
   $('arp').innerHTML=r.network.arp.map(a=>`<div class="file-item">${esc(a.ip)} · ${esc(a.mac)} · ${esc(a.interface)}</div>`).join('')||'No entries visible';
   $('wifi').textContent=r.network.wifi_entries.join('\n')||'Unavailable or not exposed to this Linux environment.';
-  $('storageNote').textContent=`${r.storage.files_scanned} files checked; ${r.storage.total_candidate_count} cleanup candidates.${r.storage.truncated?' Scan limit reached.':''} Nothing is deleted.`;
-  $('files').innerHTML=r.storage.candidates.map(f=>`<div class="file-item"><strong>${esc(f.name)} · ${esc(f.size_label)}</strong><p>${esc(f.path)}</p><p>${f.age_days} days since modification · ${esc(f.reason)}</p></div>`).join('')||'<p class="muted">No candidates found in the scanned subset.</p>';
+   $('storageNote').textContent=`${r.storage.files_scanned} files checked; ${r.storage.total_candidate_count} review candidates. ${r.storage.truncated?'Scan limit reached. ':''}No files are deleted.`;
+   const largest=(r.storage.largest_files||[]).map(f=>`<div class="file-item"><strong>${esc(f.name)} · ${esc(f.size_label)}</strong><p>${esc(f.path)}</p><p>${f.age_days} days since modification · ${esc(f.extension||'(none)')} · ${f.executable?'executable':'not executable'}</p><small>${esc(f.recommendation||'Review before removing; size alone is not suspicious.')}</small></div>`).join('')||'<p class="muted">No file metadata available.</p>';
+   const candidates=(r.storage.candidates||[]).slice(0,40).map(f=>`<div class="file-item"><strong>${esc(f.name)} · ${esc(f.size_label)} · review score ${f.score}</strong><p>${esc(f.path)}</p><p>${esc((f.signals||[]).join(' · '))}</p><small>${esc(f.recommendation||'Review before removing.')}</small></div>`).join('')||'<p class="muted">No review candidates found in the scanned subset.</p>';
+   $('files').innerHTML='<h3>Largest files (top 25)</h3>'+largest+'<h3>Files worth reviewing</h3>'+candidates;
   $('processRows').innerHTML=r.processes.slice(0,30).map(p=>`<tr><td>${esc(p.name)}</td><td>${p.pid}</td><td>${esc(p.parent_name||'—')}</td><td>${p.cpu}%</td><td>${esc(p.memory)}</td><td title="${esc(p.exe)}">${esc(p.exe||'Unavailable')}</td></tr>`).join('')||'<tr><td colspan="6">No visible processes</td></tr>';
   $('aiBtn').disabled=false;$('aiResult').textContent='Ready to analyze this scan with Ollama.';
   notice(`Assessment complete at ${new Date().toLocaleTimeString()}. Findings are leads for human review, not confirmed infections.`);
@@ -46,10 +48,21 @@ async function analyze(){
   lastAI=r;
   if(!r.available){$('aiResult').innerHTML=`<h3>AI unavailable</h3><p>${esc(r.message||r.error)}</p><p class="muted">${esc(r.error||'')}</p><p>The scan results above are unaffected; AI analysis is optional.</p>`;return}
   const a=r.analysis;
-  $('aiResult').innerHTML=`<span class="pill">${esc(r.model)}</span><h3>${esc(a.summary||'Assessment summary')}</h3><p><b>Overall risk:</b> ${esc(a.overall_risk||'unknown')}</p>${(a.findings||[]).map(f=>`<div class="ai-finding"><b>${esc(f.finding_id)}</b><p>${esc(f.explanation)}</p><p><b>Recommendation:</b> ${esc(f.recommendation)}</p><small>AI confidence: ${esc(f.confidence||'unknown')}</small></div>`).join('')}${(a.limitations||[]).length?'<h3>Limitations</h3><ul>'+a.limitations.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}`;
+   $('aiResult').innerHTML=`<span class="pill">${esc(r.model)}</span><h3>${esc(a.summary||'Assessment summary')}</h3><p><b>Overall risk:</b> ${esc(a.overall_risk||'unknown')}</p>${(a.findings||[]).map(f=>`<div class="ai-finding"><b>${esc(f.finding_id)}</b><p>${esc(f.explanation)}</p><p><b>Recommendation:</b> ${esc(f.recommendation)}</p><small>AI confidence: ${esc(f.confidence||'unknown')}</small></div>`).join('')}${(a.limitations||[]).length?'<h3>Limitations</h3><ul>'+a.limitations.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}`+((a.file_assessments||[]).length?'<h3>File metadata assessment</h3>'+a.file_assessments.map(f=>`<div class="ai-finding"><b>${esc(f.verdict)} · ${esc(f.path)}</b><p>${esc(f.explanation)}</p><p><b>Recommendation:</b> ${esc(f.recommendation)}</p><small>Confidence: ${esc(f.confidence||'low')}</small></div>`).join(''):'<p class="muted">No per-file AI assessments returned. Review the metadata candidates above.</p>');
  }catch(e){$('aiResult').textContent=`AI request failed: ${e.message}`}
  finally{b.disabled=false;b.textContent='✳ Analyze with Gemma'}
 }
 function tick(){$('clock').textContent=new Date().toLocaleTimeString()}
 tick();setInterval(tick,1000);
-api('/api/system').then(s=>{$('cpu').textContent=`${s.cpu_percent.toFixed(0)}%`;$('ram').textContent=`${s.ram_percent.toFixed(0)}%`;$('disk').textContent=`${s.disk_percent.toFixed(0)}%`;meter('cpuBar',s.cpu_percent);meter('ramBar',s.ram_percent);meter('diskBar',s.disk_percent)}).catch(()=>notice('Backend not reachable. Start the Flask server.'));
+async function refreshMetrics(){
+ try{
+  const s=await api('/api/system');
+  $('cpu').textContent=`${Number(s.cpu_percent||0).toFixed(0)}%`;
+  $('ram').textContent=`${Number(s.ram_percent||0).toFixed(0)}%`;
+  $('disk').textContent=`${Number(s.disk_percent||0).toFixed(0)}%`;
+  meter('cpuBar',s.cpu_percent);meter('ramBar',s.ram_percent);meter('diskBar',s.disk_percent);
+  $('ramMeta').textContent=`${fmt(s.ram_used)} / ${fmt(s.ram_total)}`;
+  $('diskMeta').textContent=`${fmt(s.disk_free)} free`;
+ }catch(e){if(!lastReport)notice('Backend not reachable. Start the Flask server.');}
+}
+refreshMetrics();setInterval(refreshMetrics,3000);

@@ -684,6 +684,7 @@ def scan():
     processes = process_snapshot(findings)
     network = network_snapshot(findings)
     storage = storage_snapshot(findings)
+    remember_scan_paths(storage)
 
     # Baseline is updated after comparisons. Only metadata is stored.
     old = read_baseline()
@@ -744,6 +745,9 @@ def analyze():
         "storage": report.get("storage", {}),
         "processes": report.get("processes", [])[:60],
     }))
+
+from features import features_bp, remember_scan_paths
+app.register_blueprint(features_bp)
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=False)

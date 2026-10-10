@@ -25,5 +25,53 @@
 <section class="panel"><div class="section-head"><div><p class="eyebrow">05 / PROCESS INVENTORY</p><h2>Resource consumers</h2></div><span class="pill">TOP 30</span></div><div class="table-wrap"><table><thead><tr><th>PROCESS</th><th>PID</th><th>PARENT</th><th>CPU</th><th>RAM</th><th>EXECUTABLE</th></tr></thead><tbody id="processRows"><tr><td colspan="6">No data</td></tr></tbody></table></div></section>
 <section class="panel ai-panel"><div><p class="eyebrow">06 / LOCAL AI ANALYST</p><h2>Explain the evidence<span class="accent">.</span></h2><p class="muted">Gemma automatically reviews scan findings and file metadata after local checks. File contents are not uploaded. AI output is advisory; the Python collectors remain the source of observations.</p><p id="modelLabel" class="subtle">Model: gemma4:e4b</p><p id="aiStatus" class="subtle">AI assessment starts automatically after the local scan.</p></div><div id="aiResult" class="ai-result">Run a scan first.</div></section>
 <footer>Sentinel Local · Manual snapshots · No automatic remediation · Linux container visibility varies</footer>
-</main><script src="/static/app.js"></script>
+</main>
+<button id="chatToggle" class="chat-toggle" type="button"
+        aria-label="Open scan assistant" aria-expanded="false">
+  <span aria-hidden="true">✦</span> Ask Sentinel
+</button>
+
+<aside id="chatPanel" class="chat-panel" aria-label="Scan assistant"
+       aria-hidden="true">
+  <div class="chat-header">
+    <div>
+      <p class="eyebrow">SCAN-AWARE ASSISTANT</p>
+      <h2>Ask Sentinel <span aria-hidden="true">✦</span></h2>
+      <p class="muted small">Personalized help from your scan evidence</p>
+    </div>
+    <button id="chatClose" class="chat-icon-btn" type="button"
+            aria-label="Close chat">✕</button>
+  </div>
+  <div id="chatStatus" class="chat-status">Ready when you are</div>
+  <div id="chatMessages" class="chat-messages" aria-live="polite"></div>
+  <form id="chatForm" class="chat-form">
+    <label class="sr-only" for="chatInput">Ask a question about your scan</label>
+    <textarea id="chatInput" rows="2" maxlength="4000"
+      placeholder="Ask about a finding, file, or process…"
+      required></textarea>
+    <button id="chatSend" class="primary" type="submit">Send ↗</button>
+  </form>
+  <div class="file-upload-row">
+    <input id="chatFileInput" type="file" hidden>
+    <button id="chooseChatFile" class="chat-file-btn" type="button">
+      📎 Choose file
+    </button>
+    <span id="chatFileName" class="chat-file-name">No file selected</span>
+    <button id="fileAnalyzeBtn" class="chat-file-btn primary" type="button">
+      Analyze file
+    </button>
+  </div>
+  <div class="chat-footer">
+    <span>AI advice can be wrong. Verify before acting.</span>
+    <button id="chatClear" class="chat-clear" type="button">Clear chat</button>
+  </div>
+</aside>
+
+<script src="/static/app.js"></script>
+<script>
+  // Expose the latest in-memory report to the companion chat script.
+  window.getLastScanReport = () => lastReport;
+  window.lastReportReady = () => Boolean(lastReport);
+</script>
+<script src="/static/features.js"></script>
 </body></html>

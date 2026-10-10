@@ -23,13 +23,8 @@
 <section class="panel"><div class="section-head"><div><p class="eyebrow">04 / STORAGE</p><h2>Cleanup advisor</h2></div></div><p id="storageNote" class="muted small">No storage scan yet.</p><div id="files" class="file-list"></div></section>
 </section>
 <section class="panel"><div class="section-head"><div><p class="eyebrow">05 / PROCESS INVENTORY</p><h2>Resource consumers</h2></div><span class="pill">TOP 30</span></div><div class="table-wrap"><table><thead><tr><th>PROCESS</th><th>PID</th><th>PARENT</th><th>CPU</th><th>RAM</th><th>EXECUTABLE</th></tr></thead><tbody id="processRows"><tr><td colspan="6">No data</td></tr></tbody></table></div></section>
-<<<<<<< HEAD
 <section class="panel ai-panel"><div><p class="eyebrow">06 / SENTINEL TRIAGE</p><h2>Review and approve<span class="accent">.</span></h2><p class="muted">Each finding is judged on its own by the sentinel model on the team's remote Ollama server; unclear cases are escalated for a second opinion. Nothing that changes this computer runs until you click Approve.</p><p id="modelLabel" class="subtle">Model: sentinel</p><p id="harnessNote" class="subtle">—</p><div class="card-actions"><button id="aiBtn" class="primary" onclick="scanNow()">✳ Scan now</button><button id="demoBtn" class="ghost" onclick="runDemo()" hidden>▶ Run demo</button><button id="undoIso" class="ghost" onclick="undoIsolation()" hidden>Undo isolation</button></div></div><div id="aiResult" class="ai-result file-list">Waiting for the triage service…</div></section>
 <footer>Sentinel Local · Every action needs your approval · Visibility varies by OS</footer>
-</main><script src="/static/app.js"></script>
-=======
-<section class="panel ai-panel"><div><p class="eyebrow">06 / LOCAL AI ANALYST</p><h2>Explain the evidence<span class="accent">.</span></h2><p class="muted">Gemma automatically reviews scan findings and file metadata after local checks. File contents are not uploaded. AI output is advisory; the Python collectors remain the source of observations.</p><p id="modelLabel" class="subtle">Model: gemma4:e4b</p><p id="aiStatus" class="subtle">AI assessment starts automatically after the local scan.</p></div><div id="aiResult" class="ai-result">Run a scan first.</div></section>
-<footer>Sentinel Local · Manual snapshots · No automatic remediation · Linux container visibility varies</footer>
 </main>
 <button id="chatToggle" class="chat-toggle" type="button"
         aria-label="Open scan assistant" aria-expanded="false">
@@ -79,5 +74,4 @@
   window.lastReportReady = () => Boolean(lastReport);
 </script>
 <script src="/static/features.js"></script>
->>>>>>> 0b9ca6e88c396a325115c11f7110246c70edd811
 </body></html>

@@ -1,0 +1,2 @@
+# Optional locally curated SHA-256 indicators, one 64-character hex hash per line.
+# Only use indicators from trusted, documented sources. Empty by default.

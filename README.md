@@ -1,41 +1,31 @@
 # Sentinel Local
 
-A local-first system overview prototype for a hackathon.
+Manual, read-only defensive security assessment for the accessible Linux environment.
 
-## Features
-- System/OS, CPU, memory and disk summary
-- Process snapshot with sampled CPU and RAM use
-- Short snapshot of visible local network socket metadata
-- Bounded home-directory storage scan with manual-review recommendations
-- JSON API intended for a later local AI integration
-
-## Run on Linux / ChromeOS Linux
-
-```bash
-python3 -m venv .venv
+## Start
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 python app.py
-```
 
-Open http://127.0.0.1:5000 in the browser. Stop with Ctrl+C.
+Open http://127.0.0.1:5000
 
-If venv creation or pip fails, check your Linux environment's Python/pip packages.
-Do not run this app with sudo unless you have a specific reason.
+## Ollama
+Install/start Ollama separately, then:
+ollama pull gemma4:e4b
+ollama run gemma4:e4b
 
-## API
-- `GET /api/health`
-- `GET /api/system`
-- `GET /api/processes`
-- `GET /api/network?seconds=5` (maximum 15 seconds)
-- `GET /api/storage`
-- `GET /api/report` (combined JSON payload for AI)
+The app uses http://127.0.0.1:11434 by default.
+Optional configuration:
+OLLAMA_URL=http://127.0.0.1:11434 OLLAMA_MODEL=gemma4:e4b python app.py
 
-## Safety and limitations
-- Binds only to 127.0.0.1; do not expose it to a public or shared network.
-- No file deletion or process termination.
-- Network feature observes socket metadata, not packet payloads.
-- This is not an antivirus. Heuristics do not establish malware.
-- Permissions and the ChromeOS Linux container limit visibility.
-- Storage traversal is capped at 1,500 files per request.
-- The development server is for local prototyping, not production deployment.
+## Safety and limits
+- Only scans when requested. No automatic remediation.
+- Stores a local metadata baseline in data/baseline.json.
+- Network snapshots do not include packet contents or complete DNS query history.
+- Beaconing and unusual uploads need time-series evidence.
+- First scan establishes a baseline; comparisons become useful on later scans.
+- File scanning is bounded. System-wide integrity checks are not comprehensive.
+- Hash indicators are local only; populate known_hashes.txt with trusted SHA-256 indicators.
+- Process heuristics can flag legitimate tools. Linux executable metadata is not a universal digital-signature check.
+- ChromeOS Linux containers limit process, network, Wi-Fi, and filesystem visibility.
+- Do not expose Flask's development server to a network; debug mode is off.

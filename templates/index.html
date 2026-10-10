@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Sentinel Local</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brandmark">S</div>
+  <div><strong>Sentinel<span>Local</span></strong><small>PRIVATE SYSTEM INTELLIGENCE</small></div>
+  <div class="topright"><i class="dot"></i> LOCAL ENVIRONMENT <span id="clock">--:--:--</span></div>
+</header>
+
+<main>
+  <section class="hero">
+    <div>
+      <p class="eyebrow">YOUR MACHINE. YOUR DATA.</p>
+      <h1>System overview<span class="accent">.</span></h1>
+      <p class="muted">A local-first look at system health, activity, and cleanup opportunities.</p>
+    </div>
+    <button class="primary" onclick="refreshAll()">↻ Refresh overview</button>
+  </section>
+
+  <div id="notice" class="notice">Connecting to local backend…</div>
+
+  <section class="metrics">
+    <article class="metric"><div class="metric-head">CPU LOAD <span>◉</span></div><div class="metric-value" id="cpu">—</div><div class="meter"><i id="cpuBar"></i></div><p id="cpuMeta">Processor utilization</p></article>
+    <article class="metric"><div class="metric-head">MEMORY USED <span>▤</span></div><div class="metric-value" id="ram">—</div><div class="meter"><i id="ramBar"></i></div><p id="ramMeta">RAM utilization</p></article>
+    <article class="metric"><div class="metric-head">DISK USED <span>▧</span></div><div class="metric-value" id="disk">—</div><div class="meter"><i id="diskBar"></i></div><p id="diskMeta">Home filesystem</p></article>
+    <article class="metric"><div class="metric-head">PROCESS COUNT <span>⌘</span></div><div class="metric-value" id="procCount">—</div><p>Visible processes, excluding this app</p><div class="subtle">Permission-dependent</div></article>
+  </section>
+
+  <section class="panel">
+    <div class="section-head"><div><p class="eyebrow">01 / ENVIRONMENT</p><h2>System report</h2></div><span class="pill">READ ONLY</span></div>
+    <div class="info-grid" id="systemInfo"><p class="muted">Loading system information…</p></div>
+  </section>
+
+  <section class="two-col">
+    <section class="panel">
+      <div class="section-head"><div><p class="eyebrow">02 / RESOURCE USE</p><h2>Top processes</h2></div><button class="ghost" onclick="loadProcesses()">Refresh ↻</button></div>
+      <p class="muted small">Ranked by sampled CPU and memory. High usage alone does not indicate malware.</p>
+      <div class="table-wrap"><table><thead><tr><th>PROCESS</th><th>PID</th><th>CPU</th><th>RAM</th></tr></thead><tbody id="processRows"><tr><td colspan="4">Loading…</td></tr></tbody></table></div>
+    </section>
+    <section class="panel">
+      <div class="section-head"><div><p class="eyebrow">03 / STORAGE</p><h2>Cleanup advisor</h2></div><button class="ghost" onclick="loadStorage()">Scan ↻</button></div>
+      <p class="muted small">Large or old files to review manually. No files are removed.</p>
+      <div id="storageSummary" class="storage-summary">Waiting for scan…</div>
+      <div id="storageRows" class="file-list"></div>
+    </section>
+  </section>
+
+  <section class="panel">
+    <div class="section-head"><div><p class="eyebrow">04 / NETWORK OBSERVATION</p><h2>Connection snapshot</h2></div><button class="primary" id="networkBtn" onclick="loadNetwork()">Observe for 5 seconds</button></div>
+    <p class="muted small">Reads visible local socket metadata. This is not packet inspection, an intrusion detector, or a malware verdict.</p>
+    <div id="networkSummary" class="storage-summary">No snapshot taken yet.</div>
+    <div class="table-wrap"><table><thead><tr><th>TYPE</th><th>LOCAL ENDPOINT</th><th>REMOTE ENDPOINT</th><th>STATE</th><th>PID</th></tr></thead><tbody id="networkRows"><tr><td colspan="5">Select Observe to begin.</td></tr></tbody></table></div>
+  </section>
+
+  <section class="panel ai-panel">
+    <div><p class="eyebrow">05 / INTELLIGENCE LAYER</p><h2>Your local AI goes here<span class="accent">.</span></h2><p class="muted">The data API is ready for your model. Connect it to <code>/api/report</code> and return a plain-language summary, risk explanations, and prioritized recommendations.</p></div>
+    <div class="ai-status"><span class="ai-orb">✳</span><strong>Integration pending</strong><small>Model-independent JSON API</small><a href="/api/report" target="_blank" rel="noreferrer">Inspect report JSON ↗</a></div>
+  </section>
+  <footer>Sentinel Local · Local prototype · Recommendations require human review</footer>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>

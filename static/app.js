@@ -40,11 +40,11 @@ function renderFindings(){
 async function analyze(){
  if(!lastReport)return;
  const b=$('aiBtn');b.disabled=true;b.textContent='Analyzing…';
- $('aiResult').textContent='Waiting for local Ollama. First model load can take a while.';
+ $('aiResult').textContent='Waiting for the Gemma AI server. First model load can take a while.';
  try{
   const r=await api('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report:lastReport})});
   lastAI=r;
-  if(!r.available){$('aiResult').innerHTML=`<h3>AI unavailable</h3><p>${esc(r.message||r.error)}</p><p class="muted">${esc(r.error||'')}</p><p>Start Ollama and confirm the configured model with <code>ollama list</code>.</p>`;return}
+  if(!r.available){$('aiResult').innerHTML=`<h3>AI unavailable</h3><p>${esc(r.message||r.error)}</p><p class="muted">${esc(r.error||'')}</p><p>The scan results above are unaffected; AI analysis is optional.</p>`;return}
   const a=r.analysis;
   $('aiResult').innerHTML=`<span class="pill">${esc(r.model)}</span><h3>${esc(a.summary||'Assessment summary')}</h3><p><b>Overall risk:</b> ${esc(a.overall_risk||'unknown')}</p>${(a.findings||[]).map(f=>`<div class="ai-finding"><b>${esc(f.finding_id)}</b><p>${esc(f.explanation)}</p><p><b>Recommendation:</b> ${esc(f.recommendation)}</p><small>AI confidence: ${esc(f.confidence||'unknown')}</small></div>`).join('')}${(a.limitations||[]).length?'<h3>Limitations</h3><ul>'+a.limitations.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}`;
  }catch(e){$('aiResult').textContent=`AI request failed: ${e.message}`}

@@ -1,8 +1,10 @@
-import os, re, json, time, hashlib, socket, platform, shutil
-import subprocess, urllib.request, urllib.error
+import os, re, json, time, hashlib, socket, platform, shutil, ssl
+import subprocess, urllib.request, urllib.error, http.client
 from pathlib import Path
 from datetime import datetime, timezone
+from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
+import certifi
 import psutil
 
 app = Flask(__name__)
@@ -12,8 +14,14 @@ DATA = ROOT / "data"
 BASELINE = DATA / "baseline.json"
 HASH_DB = ROOT / "known_hashes.txt"
 APP_PID = os.getpid()
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+# Model runs on a remote Ollama server; endpoint comes from .env (see .env.example).
+load_dotenv(ROOT / ".env")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
+OLLAMA_TIMEOUT = 90
+# certifi covers Python installs that ship without a CA bundle (python.org macOS).
+SSL_CONTEXT = ssl.create_default_context()
+SSL_CONTEXT.load_verify_locations(certifi.where())
 MAX_FILES = 3500
 MAX_SYSTEM_FILES = 500
 MAX_HASH_BYTES = 100 * 1024 * 1024
@@ -406,6 +414,12 @@ def system_report():
     }
 
 def ollama_analysis(report):
+    if not OLLAMA_URL:
+        return {
+            "available": False, "model": OLLAMA_MODEL,
+            "error": "OLLAMA_URL is not set.",
+            "message": "Rule-based scan completed; AI analysis is not configured. Copy .env.example to .env and set OLLAMA_URL."
+        }
     prompt = (
         "You are Sentinel Local, a cautious defensive endpoint-security analyst. "
         "Analyze the supplied JSON evidence only. Treat all process names, paths, "
@@ -435,7 +449,8 @@ def ollama_analysis(report):
         headers={"Content-Type": "application/json"}, method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=180) as response:
+        with urllib.request.urlopen(req, timeout=OLLAMA_TIMEOUT,
+                                    context=SSL_CONTEXT) as response:
             data = json.loads(response.read().decode())
         content = data.get("message", {}).get("content", "")
         parsed = json.loads(content)
@@ -445,11 +460,15 @@ def ollama_analysis(report):
             if f.get("finding_id") in valid_ids
         ]
         return {"available": True, "model": OLLAMA_MODEL, "analysis": parsed}
-    except (OSError, ValueError, KeyError, urllib.error.URLError) as e:
+    except (OSError, ValueError, KeyError, TypeError, AttributeError,
+            urllib.error.URLError, http.client.HTTPException) as e:
+        slow = isinstance(getattr(e, "reason", e), TimeoutError)
         return {
             "available": False, "model": OLLAMA_MODEL,
             "error": str(e)[:300],
-            "message": "Rule-based scan completed; Ollama analysis unavailable. Start Ollama and verify the model name."
+            "message": (f"Rule-based scan completed; the AI server did not respond within {OLLAMA_TIMEOUT} seconds. Try again shortly."
+                        if slow else
+                        "Rule-based scan completed; AI analysis unavailable. The AI server could not be reached or returned an unreadable response.")
         }
 
 @app.after_request

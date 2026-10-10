@@ -3,3 +3,12 @@ __pycache__/
 *.py[cod]
 .env
 data/baseline.json
+harness/audit.jsonl
+harness/quarantine/
+harness/state/
+sentinel/clogs/
+sentinel/*.out
+sentinel/*.log
+sentinel/modal_logs.txt
+sentinel/run_state.json
+sentinel/smoke_*.txt

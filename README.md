@@ -9,17 +9,17 @@ python app.py
 
 Open http://127.0.0.1:5000
 
-## Ollama
-Install/start Ollama separately, then:
-ollama pull gemma4:e4b
-ollama run gemma4:e4b
-
-The app uses http://127.0.0.1:11434 by default.
-Optional configuration:
-OLLAMA_URL=http://127.0.0.1:11434 OLLAMA_MODEL=gemma4:e4b python app.py
+## Model and triage
+Copy `.env.example` to `.env` and set `OLLAMA_URL` (the team's Ollama server) and, optionally,
+`GEMINI_API_KEY` for escalation. `python app.py` starts the triage harness in the background:
+each finding is judged on its own by the `sentinel` model and anything that needs action
+shows up as a card in panel 06 with Approve / Ignore. Set `DEMO_MODE=1` for a stage-safe run
+(every action is a dry run, plus a "Run demo" button that replays labeled test findings).
+Actions are logged to `harness/audit.jsonl`. Use http://127.0.0.1:5000, not localhost, on macOS
+(AirPlay Receiver also listens on port 5000).
 
 ## Safety and limits
-- Only scans when requested. No automatic remediation.
+- Always-Active monitoring (processes, storage) can be switched off in the top bar. Nothing is changed on the machine without your Approve.
 - Stores a local metadata baseline in data/baseline.json.
 - Network snapshots do not include packet contents or complete DNS query history.
 - Beaconing and unusual uploads need time-series evidence.

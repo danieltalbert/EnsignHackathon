@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-let lastReport=null, lastAI=null;
+let lastReport=null, hs='';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>{n=Number(n||0);for(const u of ['B','KB','MB','GB','TB']){if(n<1024||u==='TB')return `${n.toFixed(1)} ${u}`;n/=1024}};
 async function api(url,opts={}){const r=await fetch(url,{cache:'no-store',...opts});if(!r.ok)throw Error(`${r.status} ${r.statusText}: ${(await r.text()).slice(0,250)}`);return r.json()}
@@ -9,7 +9,7 @@ async function runScan(){
  const b=$('scanBtn');b.disabled=true;b.textContent='Scanning…';notice('Collecting a manual snapshot. This may take a little while.');
  $('findings').innerHTML='<p class="muted">Collecting evidence…</p>';
  try{
-  const r=await api('/api/scan',{method:'POST'});lastReport=r;lastAI=null;
+  const r=await api('/api/scan',{method:'POST'});lastReport=r;
   const s=r.system;
   $('cpu').textContent=`${s.cpu_percent.toFixed(0)}%`;$('ram').textContent=`${s.ram_percent.toFixed(0)}%`;$('disk').textContent=`${s.disk_percent.toFixed(0)}%`;
   meter('cpuBar',s.cpu_percent);meter('ramBar',s.ram_percent);meter('diskBar',s.disk_percent);
@@ -26,8 +26,7 @@ async function runScan(){
   $('storageNote').textContent=`${r.storage.files_scanned} files checked; ${r.storage.total_candidate_count} cleanup candidates.${r.storage.truncated?' Scan limit reached.':''} Nothing is deleted.`;
   $('files').innerHTML=r.storage.candidates.map(f=>`<div class="file-item"><strong>${esc(f.name)} · ${esc(f.size_label)}</strong><p>${esc(f.path)}</p><p>${f.age_days} days since modification · ${esc(f.reason)}</p></div>`).join('')||'<p class="muted">No candidates found in the scanned subset.</p>';
   $('processRows').innerHTML=r.processes.slice(0,30).map(p=>`<tr><td>${esc(p.name)}</td><td>${p.pid}</td><td>${esc(p.parent_name||'—')}</td><td>${p.cpu}%</td><td>${esc(p.memory)}</td><td title="${esc(p.exe)}">${esc(p.exe||'Unavailable')}</td></tr>`).join('')||'<tr><td colspan="6">No visible processes</td></tr>';
-  $('aiBtn').disabled=false;$('aiResult').textContent='Ready to analyze this scan with Ollama.';
-  notice(`Assessment complete at ${new Date().toLocaleTimeString()}. Findings are leads for human review, not confirmed infections.`);
+  notice(`Assessment complete at ${new Date().toLocaleTimeString()}. Findings are leads for human review, not confirmed infections; they were also queued for Sentinel triage (panel 06).`);
  }catch(e){notice(`Scan failed: ${e.message}`)}
  finally{b.disabled=false;b.textContent='▶ Run security assessment'}
 }
@@ -37,19 +36,43 @@ function renderFindings(){
  const list=lastReport.findings.filter(f=>filter==='All'||f.category===filter);
  $('findings').innerHTML=list.map(f=>`<article class="finding ${esc(f.severity)}"><div class="finding-top"><span class="tag">${esc(f.category)}</span><span class="severity ${esc(f.severity)}">${esc(f.severity)}</span></div><h3>${esc(f.title)}</h3><p><b>Evidence</b> · ${esc(f.evidence)}</p><p><b>Recommended action</b> · ${esc(f.recommendation)}</p><small>Rule confidence: ${esc(f.confidence)} · ID ${esc(f.id)}</small></article>`).join('')||'<p class="muted">No findings in this category for this snapshot. This does not prove the system is clean.</p>';
 }
-async function analyze(){
- if(!lastReport)return;
- const b=$('aiBtn');b.disabled=true;b.textContent='Analyzing…';
- $('aiResult').textContent='Waiting for the Gemma AI server. First model load can take a while.';
- try{
-  const r=await api('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({report:lastReport})});
-  lastAI=r;
-  if(!r.available){$('aiResult').innerHTML=`<h3>AI unavailable</h3><p>${esc(r.message||r.error)}</p><p class="muted">${esc(r.error||'')}</p><p>The scan results above are unaffected; AI analysis is optional.</p>`;return}
-  const a=r.analysis;
-  $('aiResult').innerHTML=`<span class="pill">${esc(r.model)}</span><h3>${esc(a.summary||'Assessment summary')}</h3><p><b>Overall risk:</b> ${esc(a.overall_risk||'unknown')}</p>${(a.findings||[]).map(f=>`<div class="ai-finding"><b>${esc(f.finding_id)}</b><p>${esc(f.explanation)}</p><p><b>Recommendation:</b> ${esc(f.recommendation)}</p><small>AI confidence: ${esc(f.confidence||'unknown')}</small></div>`).join('')}${(a.limitations||[]).length?'<h3>Limitations</h3><ul>'+a.limitations.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}`;
- }catch(e){$('aiResult').textContent=`AI request failed: ${e.message}`}
- finally{b.disabled=false;b.textContent='✳ Analyze with Gemma'}
+const post=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
+const sevCls=s=>['critical','high','medium'].includes(s)?s:'info';
+const human=s=>String(s||'').replace(/_/g,' ');
+async function poll(){
+ try{const s=await api('/api/harness/state'),k=JSON.stringify(s);if(k!==hs){hs=k;renderHarness(s)}}
+ catch(e){$('modelState').textContent='TRIAGE UNREACHABLE';$('modelDot').className='dot off'}
 }
+function renderHarness(s){
+ const m=s.model,st=s.stats,ev=s.events[0];
+ $('aaState').textContent=`ALWAYS-ACTIVE ${s.always_active?'ON':'OFF'}`;$('aaDot').className=`dot${s.always_active?'':' idle'}`;
+ $('modelState').textContent=m.online?'MODEL ONLINE':m.state==='checking'?'MODEL …':'MODEL OFFLINE';$('modelDot').className=`dot${m.online?'':m.state==='checking'?' idle':' off'}`;
+ $('modelLabel').textContent=`Model: ${m.name}${m.online?'':` · offline: ${m.message} Running on prefilter rules; findings stay queued.`}${s.escalation_model?` · Escalation: ${s.escalation_model}`:''}`;
+ $('demoBtn').hidden=!s.demo_mode;$('undoIso').hidden=!s.isolated;
+ $('harnessNote').textContent=`${s.demo_mode?'DEMO MODE: actions are dry runs. ':''}${s.judging?`Judging ${s.judging}. `:''}Queue ${s.queue} · cleared by model ${st.cleared||0} · skipped as normal ${st.skipped||0}${ev?` · ${ev.ts} ${ev.msg}`:''}`;
+ $('aiResult').innerHTML=s.cards.map(card).join('')||'<p class="muted">Nothing needs your attention right now.</p>';
+}
+function card(c){
+ const j=c.judgement,x=c.escalation,sev=c.severity||'none',id=esc(c.id);
+ const title=j?(j.threat_type==='none'?'Looks normal':human(j.threat_type)):c.rule?c.rule.title:human(c.label||c.source);
+ const evidence=j?j.evidence:c.rule?[c.rule.evidence]:[];
+ const tag=`${c.source}${c.origin==='demo'?' · demo replay':''}${c.status==='provisional'?' · model offline':''}${x&&x.status==='pending'?' · escalating':''}`;
+ const xs=!x?'':x.status==='pending'?`<p><b>Escalated</b> · ${esc(x.reason)}. Asking for a second opinion…</p>`:x.status==='done'?`<p><b>Second opinion (${esc(x.model)})</b> · ${esc(x.summary)} ${esc(x.guidance)}</p>${(x.steps||[]).map(t=>`<p><b>${esc(t.label)}</b> (read-only, ran automatically) · ${esc(t.result)}</p>`).join('')}`:`<p><b>Escalation</b> · ${esc(x.message)}</p>`;
+ const acts=c.actions.map(a=>{const live=a.available&&['proposed','declined','failed'].includes(a.state);return `<button class="${live?'primary':'ghost'}" ${live?'':'disabled'} title="${esc(a.reason||a.detail)}" onclick="approve('${id}','${esc(a.name)}',${!!a.confirm})">${live?'Approve: ':''}${esc(a.label)}${a.admin?` · ${esc(a.admin)}`:''}${a.state==='running'?' …':''}</button>`}).join('');
+ const results=c.actions.filter(a=>a.message||!a.available).map(a=>`<p><b>${esc(a.label)}</b> · ${esc(a.message||a.reason)}</p>`).join('');
+ return `<article class="finding ${sevCls(sev)}"><div class="finding-top"><span class="tag">${esc(tag)}</span><span class="severity ${sevCls(sev)}">${esc(sev)}</span></div><h3>${esc(title)}</h3>${evidence.length?`<p><b>Evidence</b> · ${esc(evidence.join(' · '))}</p>`:''}${j?`<p><b>What it means</b> · ${esc(j.explanation)}</p>`:''}${!j&&c.flags.length?`<p><b>Rule flags</b> · ${esc(c.flags.join(' · '))}</p>`:''}${!j&&c.rule?`<p><b>Recommended action</b> · ${esc(c.rule.recommendation)}</p>`:''}${xs}${c.notes.map(n=>`<p class="muted">${esc(n)}</p>`).join('')}${results}<div class="card-actions">${acts}<button class="ghost" onclick="ignoreCard('${id}')">${c.status==='acted'?'Dismiss':'Ignore'}</button></div><small>${j?`Model confidence: ${esc(j.confidence)} · `:''}${c.label?`Labeled: ${esc(c.label)} · `:''}ID ${esc(c.finding_id)}</small></article>`;
+}
+async function approve(id,action,confirmFirst){
+ if(confirmFirst&&!confirm('Restoring a backup overwrites the current files. Restore anyway?'))return;
+ notice('Running the approved action. If an admin prompt appears, it comes from your operating system.');
+ try{const r=await post(`/api/harness/cards/${id}/approve`,{action,confirm:confirmFirst});notice(r.message||r.status)}catch(e){notice(`Action failed: ${e.message}`)}
+ poll();
+}
+async function ignoreCard(id){try{await post(`/api/harness/cards/${id}/ignore`)}catch(e){notice(e.message)}poll()}
+async function toggleAA(){try{const r=await post('/api/harness/always_active',{on:!JSON.parse(hs||'{}').always_active});notice(`Always-Active ${r.always_active?'on':'off'}.`)}catch(e){notice(e.message)}poll()}
+async function scanNow(){try{const r=await post('/api/harness/scan');notice(r.message)}catch(e){notice(`Scan failed: ${e.message}`)}poll()}
+async function runDemo(){try{const r=await post('/api/harness/demo');notice(r.message)}catch(e){notice(`Demo failed: ${e.message}`)}poll()}
+async function undoIsolation(){if(!confirm('Remove network isolation and reconnect this computer?'))return;try{const r=await post('/api/harness/undo_isolation');notice(r.message)}catch(e){notice(e.message)}poll()}
 function tick(){$('clock').textContent=new Date().toLocaleTimeString()}
-tick();setInterval(tick,1000);
+tick();setInterval(tick,1000);poll();setInterval(poll,3000);
 api('/api/system').then(s=>{$('cpu').textContent=`${s.cpu_percent.toFixed(0)}%`;$('ram').textContent=`${s.ram_percent.toFixed(0)}%`;$('disk').textContent=`${s.disk_percent.toFixed(0)}%`;meter('cpuBar',s.cpu_percent);meter('ramBar',s.ram_percent);meter('diskBar',s.disk_percent)}).catch(()=>notice('Backend not reachable. Start the Flask server.'));

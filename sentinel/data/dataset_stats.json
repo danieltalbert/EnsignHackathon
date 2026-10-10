@@ -1,0 +1,98 @@
+{
+  "train": {
+    "n": 420,
+    "family": {
+      "threat": 189,
+      "benign": 168,
+      "hardneg": 63
+    },
+    "os": {
+      "windows": 217,
+      "macos": 116,
+      "linux": 87
+    },
+    "threat_type": {
+      "ransomware": 12,
+      "backup_deleted": 11,
+      "none": 231,
+      "backdoor_port": 12,
+      "malicious_download": 12,
+      "exposed_service": 12,
+      "system_file_tampering": 12,
+      "cryptominer": 12,
+      "mass_deletion": 12,
+      "rogue_device": 12,
+      "malicious_script": 12,
+      "backup_encrypted": 12,
+      "remote_access_tool": 12,
+      "masquerading": 12,
+      "backup_tampering": 11,
+      "stale_backup": 11,
+      "arp_spoofing": 12
+    }
+  },
+  "dev": {
+    "n": 80,
+    "family": {
+      "benign": 32,
+      "threat": 36,
+      "hardneg": 12
+    },
+    "os": {
+      "windows": 36,
+      "macos": 30,
+      "linux": 14
+    },
+    "threat_type": {
+      "none": 44,
+      "arp_spoofing": 2,
+      "system_file_tampering": 2,
+      "malicious_script": 3,
+      "malicious_download": 2,
+      "remote_access_tool": 3,
+      "rogue_device": 2,
+      "backdoor_port": 2,
+      "masquerading": 3,
+      "ransomware": 2,
+      "stale_backup": 2,
+      "backup_deleted": 2,
+      "backup_encrypted": 2,
+      "mass_deletion": 2,
+      "cryptominer": 3,
+      "exposed_service": 2,
+      "backup_tampering": 2
+    }
+  },
+  "test": {
+    "n": 80,
+    "family": {
+      "hardneg": 12,
+      "threat": 36,
+      "benign": 32
+    },
+    "os": {
+      "macos": 23,
+      "linux": 21,
+      "windows": 36
+    },
+    "threat_type": {
+      "none": 44,
+      "cryptominer": 3,
+      "exposed_service": 2,
+      "arp_spoofing": 2,
+      "backdoor_port": 2,
+      "malicious_download": 2,
+      "masquerading": 3,
+      "ransomware": 2,
+      "system_file_tampering": 2,
+      "backup_tampering": 2,
+      "remote_access_tool": 3,
+      "stale_backup": 2,
+      "backup_encrypted": 2,
+      "rogue_device": 2,
+      "backup_deleted": 2,
+      "mass_deletion": 2,
+      "malicious_script": 3
+    }
+  }
+}
